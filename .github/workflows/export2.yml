@@ -8,20 +8,32 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup .NET SDK
+      - name: Setup .NET SDK 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            6.0.x
-            10.0.x
+          dotnet-version: '10.0.x'
 
-      - name: Modify Target Framework to .NET 6
+      - name: Configure Compatibility for Windows 8.1
+        shell: powershell
         run: |
-          (Get-Content BFGDL.NET.csproj) -replace 'net10.0', 'net6.0' | Set-Content BFGDL.NET.csproj
+          # 1. Меняем целевую платформу на net10.0-windows во всех csproj файлах проекта
+          Get-ChildItem -Filter *.csproj -Recurse | ForEach-Object {
+              (Get-Content $_.FullName) -replace '<TargetFramework>net10.0</TargetFramework>', '<TargetFramework>net10.0-windows</TargetFramework>' | Set-Content $_.FullName
+          }
+          
+          # 2. Отключаем требование современной глобализации Windows 10/11 (ICU), переключая на NLS
+          # Это предотвратит падение сборок .NET 10 при старте на Windows 8.1
+          Get-ChildItem -Filter *.csproj -Recurse | ForEach-Object {
+              $content = Get-Content $_.FullName
+              if ($content -notmatch '<InvariantGlobalization>') {
+                  $content = $content -replace '</PropertyGroup>', "  <InvariantGlobalization>true</InvariantGlobalization>`n  </PropertyGroup>"
+                  Set-Content $_.FullName -Value $content
+              }
+          }
 
-      - name: Publish Standalone Executable for Win8.1
+      - name: Publish Independent Executable
         run: |
-          dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false BFGDL.NET.csproj -o ./build
+          dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false -o ./build
 
       - name: Upload EXE Artifact
         uses: actions/upload-artifact@v4
