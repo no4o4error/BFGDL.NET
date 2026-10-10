@@ -1,0 +1,25 @@
+name: Export Big Fish Links
+on:
+  workflow_dispatch: # Позволяет запускать сборку вручную кнопкой
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run Catalog Exporter
+        run: |
+          dotnet run --project BFGDL.NET.csproj -- --export-installers-json=pretty --export-limit=9000 > all_links.json
+
+      - name: Upload Result File
+        uses: actions/upload-artifact@v4
+        with:
+          name: big-fish-catalog
+          path: all_links.json
