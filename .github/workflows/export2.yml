@@ -13,27 +13,25 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Configure Compatibility for Windows 8.1
+      - name: Force Clean Target Frameworks
         shell: powershell
         run: |
-          # 1. Меняем целевую платформу на net10.0-windows во всех csproj файлах проекта
-          Get-ChildItem -Filter *.csproj -Recurse | ForEach-Object {
-              (Get-Content $_.FullName) -replace '<TargetFramework>net10.0</TargetFramework>', '<TargetFramework>net10.0-windows</TargetFramework>' | Set-Content $_.FullName
-          }
-          
-          # 2. Отключаем требование современной глобализации Windows 10/11 (ICU), переключая на NLS
-          # Это предотвратит падение сборок .NET 10 при старте на Windows 8.1
+          # Принудительно выставляем net10.0 во всех проектах, стирая любые net6.0 или net10.0-windows
           Get-ChildItem -Filter *.csproj -Recurse | ForEach-Object {
               $content = Get-Content $_.FullName
+              $content = $content -replace '<TargetFramework>.*?</TargetFramework>', '<TargetFramework>net10.0</TargetFramework>'
+              
+              # Добавляем отключение ICU (глобализации Win10) для совместимости запуска с Win 8.1
               if ($content -notmatch '<InvariantGlobalization>') {
                   $content = $content -replace '</PropertyGroup>', "  <InvariantGlobalization>true</InvariantGlobalization>`n  </PropertyGroup>"
-                  Set-Content $_.FullName -Value $content
               }
+              Set-Content $_.FullName -Value $content
           }
 
-      - name: Publish Independent Executable
+      - name: Publish Main CLI Project Directly
         run: |
-          dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false -o ./build
+          # Указываем путь конкретно к исполняемому проекту, игнорируя файл решения .slnx
+          dotnet publish BFGDL.NET/BFGDL.NET.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false -o ./build
 
       - name: Upload EXE Artifact
         uses: actions/upload-artifact@v4
