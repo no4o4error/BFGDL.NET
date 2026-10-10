@@ -17,14 +17,23 @@ jobs:
         shell: powershell
         run: |
           Get-ChildItem -Filter *.csproj -Recurse | ForEach-Object {
-              $content = Get-Content $_.FullName
-              # Принудительно ставим net8.0 для всех зависимых проектов
-              $content = $content -replace '<TargetFramework>.*?</TargetFramework>', '<TargetFramework>net8.0</TargetFramework>'
+              content = Get-Content _.FullName
+              # Переводим на net8.0 для работы на Windows 8.1
+              content = content -replace '<TargetFramework>.*?</TargetFramework>', '<TargetFramework>net8.0</TargetFramework>'
+              
+              # Принудительно включаем поддержку C# 14.0 для поддержки ключевого слова 'field'
+              if (\$content -match '<LangVersion>.*?</LangVersion>') {
+                  content = content -replace '<LangVersion>.*?</LangVersion>', '<LangVersion>14.0</LangVersion>'
+              } elseif (\$content -match '</PropertyGroup>') {
+                  content = content -replace '</PropertyGroup>', "  <LangVersion>14.0</LangVersion>`n  </PropertyGroup>"
+              }
+
               if ($content -notmatch '<InvariantGlobalization>') {
                   $content = $content -replace '</PropertyGroup>', "  <InvariantGlobalization>true</InvariantGlobalization>`n  </PropertyGroup>"
               }
-              Set-Content $_.FullName -Value $content
+              Set-Content \(_.FullName -Value\)content
           }
+
 
       - name: Publish Main CLI Project Directly
         shell: powershell
