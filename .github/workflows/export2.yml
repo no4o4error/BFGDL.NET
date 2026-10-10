@@ -16,12 +16,9 @@ jobs:
       - name: Force Clean Target Frameworks and Fix Compatibility
         shell: powershell
         run: |
-          # 1. Принудительно выставляем net10.0 во всех проектах, стирая любые другие версии
           Get-ChildItem -Filter *.csproj -Recurse | ForEach-Object {
               $content = Get-Content $_.FullName
               $content = $content -replace '<TargetFramework>.*?</TargetFramework>', '<TargetFramework>net10.0</TargetFramework>'
-              
-              # Отключаем требование глобализации Windows 10/11 (ICU), переключая на NLS для Win 8.1
               if ($content -notmatch '<InvariantGlobalization>') {
                   $content = $content -replace '</PropertyGroup>', "  <InvariantGlobalization>true</InvariantGlobalization>`n  </PropertyGroup>"
               }
@@ -31,14 +28,7 @@ jobs:
       - name: Publish Main CLI Project Directly
         shell: powershell
         run: |
-          # 2. Автоматически находим главный .csproj (исключая папки Core и GUI)
-          $projectFile = Get-ChildItem -Filter *.csproj -Recurse | 
-                         Where-Object { $_.FullName -notmatch "Core" -and $_.FullName -notmatch "GUI" } | 
-                         Select-Object -First 1 -ExpandProperty FullName
-          
-          Write-Host "Найден файл проекта для сборки: $projectFile"
-          
-          # 3. Собираем проект напрямую по найденному пути
+          $projectFile = Get-ChildItem -Filter *.csproj -Recurse | Where-Object { $_.FullName -notmatch "Core" -and $_.FullName -notmatch "GUI" } | Select-Object -First 1 -ExpandProperty FullName
           dotnet publish $projectFile -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false -o ./build
 
       - name: Upload EXE Artifact
