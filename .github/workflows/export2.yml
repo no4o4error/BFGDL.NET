@@ -13,15 +13,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Force Clean Target Frameworks
+      - name: Force Clean Target Frameworks and Fix Compatibility
         shell: powershell
         run: |
-          # Принудительно выставляем net10.0 во всех проектах, стирая любые net6.0 или net10.0-windows
+          # 1. Принудительно выставляем net10.0 во всех проектах, стирая любые другие версии
           Get-ChildItem -Filter *.csproj -Recurse | ForEach-Object {
               $content = Get-Content $_.FullName
               $content = $content -replace '<TargetFramework>.*?</TargetFramework>', '<TargetFramework>net10.0</TargetFramework>'
               
-              # Добавляем отключение ICU (глобализации Win10) для совместимости запуска с Win 8.1
+              # Отключаем требование глобализации Windows 10/11 (ICU), переключая на NLS для Win 8.1
               if ($content -notmatch '<InvariantGlobalization>') {
                   $content = $content -replace '</PropertyGroup>', "  <InvariantGlobalization>true</InvariantGlobalization>`n  </PropertyGroup>"
               }
@@ -29,9 +29,17 @@ jobs:
           }
 
       - name: Publish Main CLI Project Directly
+        shell: powershell
         run: |
-          # Указываем путь конкретно к исполняемому проекту, игнорируя файл решения .slnx
-          dotnet publish BFGDL.NET/BFGDL.NET.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false -o ./build
+          # 2. Автоматически находим главный .csproj (исключая папки Core и GUI)
+          $projectFile = Get-ChildItem -Filter *.csproj -Recurse | 
+                         Where-Object { $_.FullName -notmatch "Core" -and $_.FullName -notmatch "GUI" } | 
+                         Select-Object -First 1 -ExpandProperty FullName
+          
+          Write-Host "Найден файл проекта для сборки: $projectFile"
+          
+          # 3. Собираем проект напрямую по найденному пути
+          dotnet publish $projectFile -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false -o ./build
 
       - name: Upload EXE Artifact
         uses: actions/upload-artifact@v4
