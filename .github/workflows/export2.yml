@@ -1,0 +1,30 @@
+name: Build BFGDL for Windows 8.1
+on: workflow_dispatch
+
+jobs:
+  build-win8:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.0.x
+            10.0.x
+
+      - name: Modify Target Framework to .NET 6
+        run: |
+          (Get-Content BFGDL.NET.csproj) -replace 'net10.0', 'net6.0' | Set-Content BFGDL.NET.csproj
+
+      - name: Publish Standalone Executable for Win8.1
+        run: |
+          dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=false BFGDL.NET.csproj -o ./build
+
+      - name: Upload EXE Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bfgdl-windows-8.1
+          path: ./build/
